@@ -15,7 +15,7 @@ puts Benchmark.measure {
   parser.skip_document_props
   parser.read_graph_preheader
   parser.read_graph_header
-  parser.read_graph
+  graph = parser.read_graph
 
   writer = Seafoam::GraphvizWriter.new(File.open('/dev/null', 'w'))
   writer.write_graph graph

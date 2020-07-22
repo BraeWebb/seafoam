@@ -15,7 +15,7 @@ parser.read_file_header
 parser.skip_document_props
 parser.read_graph_preheader
 parser.read_graph_header
-parser.read_graph
+graph = parser.read_graph
 
 Benchmark.ips do |x|
   x.warmup = 10

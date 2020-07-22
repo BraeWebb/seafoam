@@ -79,7 +79,7 @@ module Seafoam
       end
   
       def eof?
-        @n == @string.length
+        @n == @string.bytesize
       end
 
       def unpack(expression, length)

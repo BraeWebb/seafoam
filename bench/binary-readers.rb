@@ -80,18 +80,19 @@ Benchmark.ips do |x|
       parser.read_graph
     end
   end
+=end
 
   x.report('FFI-read') do
     string = File.read(BGV_FILE)
     pointer = FFI::MemoryPointer.from_string(string)
-    parser = Seafoam::BGVParser.new(Seafoam::FFIBinaryReader.new(pointer, string.length))
+    parser = Seafoam::BGVParser.new(Seafoam::FFIBinaryReader.new(pointer, string.bytesize))
     parser.read_file_header
     parser.skip_document_props
     loop do
       index, = parser.read_graph_preheader
       break unless index
 
-      parser.read_graph_header
+      header = parser.read_graph_header
       parser.read_graph
     end
     pointer.free
@@ -99,7 +100,7 @@ Benchmark.ips do |x|
 
   x.report('FFI-string') do
     pointer = FFI::MemoryPointer.from_string(BGV_STRING)
-    parser = Seafoam::BGVParser.new(Seafoam::FFIBinaryReader.new(pointer, BGV_STRING.length))
+    parser = Seafoam::BGVParser.new(Seafoam::FFIBinaryReader.new(pointer, BGV_STRING.bytesize))
     parser.read_file_header
     parser.skip_document_props
     loop do
@@ -111,7 +112,6 @@ Benchmark.ips do |x|
     end
     pointer.free
   end
-=end
 
   x.compare!
 end

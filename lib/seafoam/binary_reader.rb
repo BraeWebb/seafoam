@@ -11,7 +11,7 @@ module Seafoam
       when String
         IOBinaryReader.new(StringIO.new(source))
       else
-        raise source.class
+        source
       end
     end
   end

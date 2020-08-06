@@ -27,6 +27,31 @@ module Seafoam
       to.inputs.push edge
       edge
     end
+
+    # Return a list of all nodes that have changed between this
+    # graph and the graph given as a parameter
+    def diff(o)
+      if o == nil
+        return nodes.map {|id, node| id}
+      end
+      if o.class != self.class
+        return []
+      end
+
+      changed_nodes = []
+      for id, node in nodes do
+        # node didn't previously exist and therefore is modified
+        if o.nodes[id] == nil
+          changed_nodes += [id]
+          next
+        end
+        # label of the node differs and therefore is modified
+        if node.props[:label] != o.nodes[id].props[:label]
+          changed_nodes += [id]
+        end
+      end
+      changed_nodes
+    end
   end
 
   # A node, with properties, input edges, and output edges.

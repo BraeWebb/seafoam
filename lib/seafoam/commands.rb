@@ -26,6 +26,8 @@ module Seafoam
           info name, *args
         when 'list'
           list name, *args
+        when 'diff'
+          diff name, *args
         when 'search'
           search name, *args
         when 'edges'
@@ -73,6 +75,76 @@ module Seafoam
         graph_header = parser.read_graph_header
         @out.puts "#{file}:#{index}  #{parser.graph_name(graph_header)}"
         parser.skip_graph
+      end
+    end
+
+    # seafoam file.bgv diff options...
+    def diff(name, *args)
+      file, *rest = parse_name(name)
+      raise ArgumentError, 'diff only works with a file' unless rest == [nil, nil, nil]
+
+      options = {}
+
+      # parse diff command arguments
+      args = args.dup
+      until args.empty?
+        arg = args.shift
+        case arg
+        when '--out'
+          options[:outfile] = args.shift
+          raise ArgumentError, 'no file for --out' unless options[:outfile]
+          raise ArgumentError, 'output directory does not exist' unless File.directory?(options[:outfile])
+        when '--spotlight'
+          options[:spotlight] = true
+        when '--show-frame-state'
+          options[:hide_frame_state] = false
+        when '--hide-floating'
+          options[:hide_floating] = true
+        when '--no-reduce-edges'
+          options[:reduce_edges] = false
+        else
+          raise ArgumentError, "unexpected option #{arg}"
+        end
+      end
+
+      raise ArgumentError, 'diff requires an output directory' unless options[:outfile]
+
+      # parse graph file
+      parser = BGVParser.new(File.new(file))
+      parser.read_file_header
+      parser.skip_document_props
+
+      last_graph = nil
+      transformed_graph_count = 0
+      loop do
+        index, = parser.read_graph_preheader
+        break unless index
+
+        graph_header = parser.read_graph_header
+        graph = parser.read_graph
+
+        modified_nodes = graph.diff(last_graph)
+        next unless modified_nodes != []
+
+        # read only the phase name from the header
+        phase = graph_header[:args][0].split(".")[-1]
+
+        @out.puts "Phase: #{index}:#{parser.graph_name(graph_header)}"
+        
+        # generate a filename in the output directory
+        # filename form: {graph_number}_{phase_name}.png
+        filename = transformed_graph_count.to_s + "_" + phase
+        path = options[:outfile] + "/" + filename + ".png"
+
+        # set rendering options
+        graph_options = options.dup
+        graph_options[:outfile] = path
+        graph_options[:spotlight_nodes] = modified_nodes if options[:spotlight]
+
+        render_graph name + ":" + index.to_s, graph_options
+
+        transformed_graph_count += 1
+        last_graph = graph
       end
     end
 
@@ -224,33 +296,27 @@ module Seafoam
       raise ArgumentError, 'render needs at least a graph' unless graph_index
       raise ArgumentError, 'render only works with a graph' unless rest == [nil, nil]
 
-      annotator_options = {
-        hide_frame_state: true,
-        hide_floating: false,
-        reduce_edges: true
-      }
-      spotlight_nodes = nil
+      options = {}
+
       args = args.dup
-      out_file = nil
-      explicit_out_file = false
       until args.empty?
         arg = args.shift
         case arg
         when '--out'
-          out_file = args.shift
-          explicit_out_file = true
-          raise ArgumentError, 'no file for --out' unless out_file
+          options[:outfile] = args.shift
+          options[:auto_open_outfile] = true
+          raise ArgumentError, 'no file for --out' unless options[:outfile]
         when '--spotlight'
           spotlight_arg = args.shift
           raise ArgumentError, 'no list for --spotlight' unless spotlight_arg
 
-          spotlight_nodes = spotlight_arg.split(',').map { |n| Integer(n) }
+          options[:spotlight_nodes] = spotlight_arg.split(',').map { |n| Integer(n) }
         when '--show-frame-state'
-          annotator_options[:hide_frame_state] = false
+          options[:hide_frame_state] = false
         when '--hide-floating'
-          annotator_options[:hide_floating] = true
+          options[:hide_floating] = true
         when '--no-reduce-edges'
-          annotator_options[:reduce_edges] = false
+          options[:reduce_edges] = false
         when '--option'
           key = args.shift
           raise ArgumentError, 'no key for --option' unless key
@@ -259,54 +325,13 @@ module Seafoam
           raise ArgumentError, "no value for --option #{key}" unless out_file
 
           value = { 'true' => true, 'false' => 'false' }.fetch(key, value)
-          annotator_options[key.to_sym] = value
+          options[key.to_sym] = value
         else
           raise ArgumentError, "unexpected option #{arg}"
         end
       end
-      out_file ||= 'graph.pdf'
-      out_ext = File.extname(out_file).downcase
-      case out_ext
-      when '.pdf'
-        out_format = :pdf
-      when '.svg'
-        out_format = :svg
-      when '.png'
-        out_format = :png
-      when '.dot'
-        out_format = :dot
-      else
-        raise ArgumentError, "unknown render format #{out_ext}"
-      end
-
-      with_graph(file, graph_index) do |parser|
-        parser.skip_graph_header
-        graph = parser.read_graph
-        Annotators.apply graph, annotator_options
-        if spotlight_nodes
-          spotlight = Spotlight.new(graph)
-          spotlight_nodes.each do |node_id|
-            node = graph.nodes[node_id]
-            raise ArgumentError, 'node not found' unless node
-
-            spotlight.light node
-          end
-          spotlight.shade
-        end
-        if out_format == :dot
-          File.open(out_file, 'w') do |stream|
-            writer = GraphvizWriter.new(stream)
-            writer.write_graph graph
-          end
-        else
-          IO.popen(['dot', "-T#{out_format}", '-o', out_file], 'w') do |stream|
-            writer = GraphvizWriter.new(stream)
-            hidpi = out_format == :png
-            writer.write_graph graph, hidpi
-          end
-          autoopen out_file unless explicit_out_file
-        end
-      end
+      
+      render_graph name, options
     end
 
     # seafoam file.bgv debug options...
@@ -429,6 +454,74 @@ module Seafoam
         edge = nil
       end
       [file] + [graph, node, edge].map { |i| i.nil? ? nil : Integer(i) }
+    end
+
+    # Render a graph given some configuration options
+    def render_graph(
+      name,
+      options = {}
+    )
+      # load default render options
+      options = {
+        hide_frame_state: true,
+        hide_floating: false,
+        reduce_edges: true,
+        spotlight_nodes: nil,
+        outfile: "graph.pdf",
+        auto_open_outfile: false,
+      }.merge(options)
+
+      file, graph_index, *rest = parse_name(name)
+
+      # select output render format
+      outfile = options[:outfile]
+      out_ext = File.extname(outfile).downcase
+      case out_ext
+      when '.pdf'
+        out_format = :pdf
+      when '.svg'
+        out_format = :svg
+      when '.png'
+        out_format = :png
+      when '.dot'
+        out_format = :dot
+      else
+        raise ArgumentError, "unknown render format #{out_ext}"
+      end
+
+      with_graph(file, graph_index) do |parser|
+        parser.skip_graph_header
+        graph = parser.read_graph
+        Annotators.apply graph, options
+        # highlight spotlight nodes in graph
+        spotlight_nodes = options[:spotlight_nodes]
+        if spotlight_nodes
+          spotlight = Spotlight.new(graph)
+          spotlight_nodes.each do |node_id|
+            node = graph.nodes[node_id]
+            raise ArgumentError, 'node not found' unless node
+
+            spotlight.light node
+          end
+          spotlight.shade
+        end
+
+        # render and output graph
+        if out_format == :dot
+          File.open(outfile, 'w') do |stream|
+            writer = GraphvizWriter.new(stream)
+            writer.write_graph graph
+          end
+        else
+          IO.popen(['dot', "-T#{out_format}", '-o', outfile], 'w') do |stream|
+            writer = GraphvizWriter.new(stream)
+            hidpi = out_format == :png
+            writer.write_graph graph, hidpi
+          end
+
+          autoopen outfile unless options[:auto_open_outfile]
+        end
+      end
     end
 
     # Pretty-print a JSON-style object.

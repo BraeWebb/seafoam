@@ -91,13 +91,11 @@ module Seafoam
 
     def write_edges(inline_attrs, graph)
       graph.edges.each do |edge|
-        # Skip the edge if it's from a node that is hidden and it doesn't point
-        # to a shaded node.
-        next if edge.from.props[:hidden] && edge.to.props[:spotlight] != 'shaded'
+        # Skip the edge if it's from a node that is hidden
+        next if edge.from.props[:hidden]
 
-        # Skip the edge if it's to a node that is hidden and it doesn't come
-        # from a shaded node.
-        next if edge.to.props[:hidden] && edge.from.props[:spotlight] != 'shaded'
+        # Skip the edge if it's to a node that is hidden
+        next if edge.to.props[:hidden]
 
         write_edge inline_attrs, edge
       end
@@ -135,6 +133,11 @@ module Seafoam
       # Convert attributes to shaded if any edges involved are shaded.
       attrs = shade(attrs) if edge.nodes.any? { |n| n.props[:spotlight] == 'shaded' }
 
+      # Make edges to hidden nodes invisibile
+      if edge.to.props[:hidden]
+        attrs[:style] = 'invis'
+      end
+
       # Does this edge come from an inlined node?
 
       if edge.from.props[:inlined]
@@ -143,12 +146,17 @@ module Seafoam
         # user it's a short edge and the from-node is show directly above the
         # to-node.
 
-        if edge.to.props[:spotlight] == 'shaded'
-          # Draw inlined edges to shaded nodes as invisible.
+        if edge.to.props[:hidden]
+          # Draw inlined edges to hidden nodes as invisible.
           node_attrs = { label: '', style: 'invis' }
         else
           # Get attributes from when we went through nodes earlier.
           node_attrs = inline_attrs[edge.from.id]
+        end
+
+        # Draw inlined edges to shaded nodes as shaded
+        if edge.to.props[:spotlight] == 'shaded'
+          node_attrs = shade(node_attrs)
         end
 
         # Inlined nodes skip the arrow for simplicity.

@@ -21,7 +21,7 @@ module Seafoam
     # as you want.
     def shade
       @graph.nodes.each_value do |node|
-        node.props[:hidden] = true unless node.props[:spotlight]
+        node.props[:spotlight] ||= 'shaded'
       end
     end
   end

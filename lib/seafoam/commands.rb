@@ -166,7 +166,7 @@ module Seafoam
       File.open(options[:latex_listing], 'w') do |fo|
         graphs.each do |graph|
           fo.puts("\\begin{figure}[h]")
-          fo.puts("\\caption{Graph ##{graph[:graph_number]}: #{graph[:phase]}}")
+          fo.puts("\\caption{Graph \\##{graph[:graph_number]}: #{graph[:phase]}}")
           fo.puts("\\centering")
           fo.puts("\\includegraphics[width=\\textwidth]{#{graph[:path]}}")
           fo.puts("\\end{figure}")

@@ -92,7 +92,7 @@ module Seafoam
         case arg
         when '--out'
           options[:outfile] = args.shift
-          raise ArgumentError, 'no file for --out' unless options[:outfile]
+          raise ArgumentError, 'no directory for --out' unless options[:outfile]
           raise ArgumentError, 'output directory does not exist' unless File.directory?(options[:outfile])
         when '--spotlight'
           options[:spotlight] = true
@@ -432,6 +432,12 @@ module Seafoam
       @out.puts '               --hide-floating'
       @out.puts '               --no-reduce-edges'
       @out.puts '               --option key value'
+      @out.puts '        file.bgv diff'
+      @out.puts '               --out directory'
+      @out.puts '               --spotlight'
+      @out.puts '               --show-frame-state'
+      @out.puts '               --hide-floating'
+      @out.puts '               --no-reduce-edges'
     end
 
     # Prints the version.

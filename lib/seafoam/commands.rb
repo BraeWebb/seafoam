@@ -94,6 +94,9 @@ module Seafoam
           options[:outfile] = args.shift
           raise ArgumentError, 'no directory for --out' unless options[:outfile]
           raise ArgumentError, 'output directory does not exist' unless File.directory?(options[:outfile])
+        when '--latex-listing'
+          options[:latex_listing] = args.shift
+          raise ArgumentError, 'no file for --latex-listing' unless options[:latex_listing]
         when '--spotlight'
           options[:spotlight] = true
         when '--show-frame-state'
@@ -113,6 +116,8 @@ module Seafoam
       parser = BGVParser.new(File.new(file))
       parser.read_file_header
       parser.skip_document_props
+
+      graphs = []
 
       last_graph = nil
       transformed_graph_count = 0
@@ -143,8 +148,29 @@ module Seafoam
 
         render_graph name + ":" + index.to_s, graph_options
 
+        graphs += [{
+          phase: phase,
+          filename: filename,
+          path: path,
+          index: index,
+          graph_number: transformed_graph_count,
+          phase_full_name: parser.graph_name(graph_header)
+        }]
+
         transformed_graph_count += 1
         last_graph = graph
+      end
+
+      return unless options[:latex_listing]
+
+      File.open(options[:latex_listing], 'w') do |fo|
+        graphs.each do |graph|
+          fo.puts("\\begin{figure}[h]")
+          fo.puts("\\caption{Graph ##{graph[:graph_number]}: #{graph[:phase]}}")
+          fo.puts("\\centering")
+          fo.puts("\\includegraphics[width=\\textwidth]{#{graph[:path]}}")
+          fo.puts("\\end{figure}")
+        end
       end
     end
 
@@ -434,6 +460,7 @@ module Seafoam
       @out.puts '               --option key value'
       @out.puts '        file.bgv diff'
       @out.puts '               --out directory'
+      @out.puts '               --latex-listing graphs.tex'
       @out.puts '               --spotlight'
       @out.puts '               --show-frame-state'
       @out.puts '               --hide-floating'

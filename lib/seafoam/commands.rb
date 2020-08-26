@@ -94,6 +94,9 @@ module Seafoam
           options[:outfile] = args.shift
           raise ArgumentError, 'no directory for --out' unless options[:outfile]
           raise ArgumentError, 'output directory does not exist' unless File.directory?(options[:outfile])
+        when '--dot-path'
+          options[:dot_path] = args.shift
+          raise ArgumentError, 'no path for --dot-path' unless options[:dot_path]
         when '--latex-listing'
           options[:latex_listing] = args.shift
           raise ArgumentError, 'no file for --latex-listing' unless options[:latex_listing]
@@ -332,6 +335,9 @@ module Seafoam
           options[:outfile] = args.shift
           options[:auto_open_outfile] = true
           raise ArgumentError, 'no file for --out' unless options[:outfile]
+        when '--dot-path'
+          options[:dot_path] = args.shift
+          raise ArgumentError, 'no path for --dot-path' unless options[:dot_path]
         when '--spotlight'
           spotlight_arg = args.shift
           raise ArgumentError, 'no list for --spotlight' unless spotlight_arg
@@ -458,6 +464,7 @@ module Seafoam
       @out.puts '               --hide-floating'
       @out.puts '               --no-reduce-edges'
       @out.puts '               --option key value'
+      @out.puts '               --dot_path path_to_dot'
       @out.puts '        file.bgv diff'
       @out.puts '               --out directory'
       @out.puts '               --latex-listing graphs.tex'
@@ -465,6 +472,7 @@ module Seafoam
       @out.puts '               --show-frame-state'
       @out.puts '               --hide-floating'
       @out.puts '               --no-reduce-edges'
+      @out.puts '               --dot_path path_to_dot'
     end
 
     # Prints the version.
@@ -502,6 +510,7 @@ module Seafoam
         spotlight_nodes: nil,
         outfile: "graph.pdf",
         auto_open_outfile: false,
+        dot_path: "dot",
       }.merge(options)
 
       file, graph_index, *rest = parse_name(name)
@@ -546,7 +555,7 @@ module Seafoam
             writer.write_graph graph
           end
         else
-          IO.popen(['dot', "-T#{out_format}", '-o', outfile], 'w') do |stream|
+          IO.popen([dot_path, "-T#{out_format}", '-o', outfile], 'w') do |stream|
             writer = GraphvizWriter.new(stream)
             hidpi = out_format == :png
             writer.write_graph graph, hidpi

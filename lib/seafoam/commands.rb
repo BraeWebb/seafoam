@@ -555,7 +555,7 @@ module Seafoam
             writer.write_graph graph
           end
         else
-          IO.popen([dot_path, "-T#{out_format}", '-o', outfile], 'w') do |stream|
+          IO.popen([options[:dot_path], "-T#{out_format}", '-o', outfile], 'w') do |stream|
             writer = GraphvizWriter.new(stream)
             hidpi = out_format == :png
             writer.write_graph graph, hidpi

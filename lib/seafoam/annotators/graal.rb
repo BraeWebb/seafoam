@@ -1,3 +1,13 @@
+MERGE_NODES = %w[
+  org.graalvm.compiler.nodes.MergeNode
+  org.graalvm.compiler.nodes.LoopBeginNode
+]
+
+END_NODES = %w[
+  org.graalvm.compiler.nodes.EndNode
+  org.graalvm.compiler.nodes.LoopEndNode
+]
+
 module Seafoam
   module Annotators
     # The Graal annotator applies if it looks like it was compiled by Graal or
@@ -22,6 +32,26 @@ module Seafoam
 
       # Annotate nodes with their label and kind
       def annotate_nodes(graph)
+        graph.nodes.each_value do |node|
+            node_class = node.props[:node_class][:node_class]
+            if END_NODES.include?(node_class) then
+              case node_class
+              # loop end nodes need their have an input edges which needs swapping
+              when 'org.graalvm.compiler.nodes.LoopEndNode'
+                merges = node.inputs
+                  .filter {|e| MERGE_NODES.include?(e.from.props[:node_class][:node_class])}
+                  .map { |e| Seafoam::Edge.new(e.to, e.from, e.props) }
+                  
+                merges.map {|e| e.instance_variable_set(:@from, node)}
+      
+                merges.each {|e| e.to.inputs.push(e)}
+              # end nodes just need their successors cleared
+              when 'org.graalvm.compiler.nodes.EndNode'
+                node.instance_variable_set(:@outputs, [])
+              end
+            end
+          end
+
         graph.nodes.each_value do |node|
           # The Java class of the node.
           node_class = node.props.dig(:node_class, :node_class)
@@ -210,16 +240,16 @@ module Seafoam
       # Annotate edges with their label and kind.
       def annotate_edges(graph)
         graph.edges.each do |edge|
-          if edge.to.props.dig(:node_class, :node_class) == 'org.graalvm.compiler.nodes.ValuePhiNode' && edge.props[:name] == 'values'
-            merge_node = edge.to.edges.find { |e| e.props[:name] == 'merge' }.from
-            control_into_merge = %w[ends loopBegin]
-            merge_node_control_edges_in = merge_node.edges.select { |e| control_into_merge.include?(e.props[:name]) && e.to.props.dig(:node_class, :node_class) != 'org.graalvm.compiler.nodes.LoopExitNode' }
-            matching_control_edge = merge_node_control_edges_in[edge.props[:index]]
-            control_in_node = matching_control_edge.nodes.find { |n| n != merge_node }
-            edge.props[:label] = "from #{control_in_node.id}"
-            edge.props[:kind] = 'data'
-            next
-          end
+        #   if edge.to.props.dig(:node_class, :node_class) == 'org.graalvm.compiler.nodes.ValuePhiNode' && edge.props[:name] == 'values'
+        #     merge_node = edge.to.edges.find { |e| e.props[:name] == 'merge' }.from
+        #     control_into_merge = %w[ends loopBegin]
+        #     merge_node_control_edges_in = merge_node.edges.select { |e| control_into_merge.include?(e.props[:name]) && e.to.props.dig(:node_class, :node_class) != 'org.graalvm.compiler.nodes.LoopExitNode' }
+        #     matching_control_edge = merge_node_control_edges_in[edge.props[:index]]
+        #     control_in_node = matching_control_edge.nodes.find { |n| n != merge_node }
+        #     edge.props[:hidden] = true
+        #     edge.props[:kind] = 'input'
+        #     next
+        #   end
 
           # Look at the name of the edge to decide how to treat them.
           case edge.props[:name]
@@ -237,6 +267,9 @@ module Seafoam
             when 'exceptionEdge'
               # Simplify exceptionEdge to unwind
               edge.props[:label] = 'unwind'
+            when 'ends'
+                edge.props[:kind] = 'info'
+                edge.props[:reverse] = true
             end
 
           # Info edges, which are drawn reversed as they point from the user
@@ -244,12 +277,11 @@ module Seafoam
           when 'frameState', 'callTarget', 'stateAfter'
             edge.props[:label] = nil
             edge.props[:kind] = 'info'
-            edge.props[:reverse] = true
 
           # Condition for branches, which we label as ?.
           when 'condition'
             edge.props[:kind] = 'data'
-            edge.props[:label] = '?'
+            # edge.props[:label] = '?'
 
           # loopBegin edges point from LoopEndNode (continue) and LoopExitNode
           # (break) to the LoopBeginNode. Both are drawn reversed.
@@ -259,8 +291,8 @@ module Seafoam
             case edge.to.props.dig(:node_class, :node_class)
             when 'org.graalvm.compiler.nodes.LoopEndNode'
               # If it's from the LoopEnd then it's the control edge to follow.
-              edge.props[:kind] = 'loop'
-              edge.props[:reverse] = true
+            #   edge.props[:kind] = 'loop'
+              edge.props[:kind] = 'info'
             when 'org.graalvm.compiler.nodes.LoopExitNode'
               # If it's from the LoopExit then it's just for information - it's
               # not control flow to follow.
@@ -295,9 +327,33 @@ module Seafoam
           # Everything else is data.
           else
             edge.props[:kind] = 'data'
-            edge.props[:label] = edge.props[:name]
+            # edge.props[:label] = edge.props[:name]
 
           end
+
+          case edge.props[:kind]
+
+          when 'data'
+            edge.props[:reverse] = true
+          end
+
+        #   if edge.to.props.dig(:node_class, :node_class) == 'org.graalvm.compiler.nodes.ValuePhiNode' && edge.props[:name] == 'values'
+        #     if SIMPLE_INPUTS.include?(edge.from.props.dig(:node_class, :node_class))
+        #         edge.props[:label] = "sos"
+        #     else
+        #         # edge.props[:kind] = "invisible"
+        #     end
+        #   end
+
+        #   if edge.from.props.dig(:node_class, :node_class) == 'org.graalvm.compiler.nodes.ParameterNode'
+        #     puts edge.props[:name]
+        #     edge.props[:reverse] = false
+        #   end
+
+        #   case edge.props[:name]
+        #   when 'merge'
+        #     edge.props[:reverse] = false
+        #   end
         end
       end
 
@@ -325,11 +381,11 @@ module Seafoam
       # using node. This reduces very long edges all across the graph. We inline
       # nodes that are 'simple', like parameters and constants.
       def reduce_edges(graph)
-        graph.nodes.each_value do |node|
-          if SIMPLE_INPUTS.include?(node.props.dig(:node_class, :node_class))
-            node.props[:inlined] = true
-          end
-        end
+        # graph.nodes.each_value do |node|
+        #   if SIMPLE_INPUTS.include?(node.props.dig(:node_class, :node_class))
+        #     node.props[:inlined] = true
+        #   end
+        # end
       end
 
       # Hide nodes that have no non-hidden users and no control flow in. These

@@ -6,7 +6,7 @@ module Seafoam
 
   WHITE_ICE = '#d7ede7'
   CRUISE = '#b8ddd1'
-  KEPPEL = '#3cb4a4'
+  KEPPEL = '#267a6f'
   CARISSMA = '#e98693'
   AMARANTH = '#da2d4f'
   BLACK = '#1a1919'
@@ -15,4 +15,5 @@ module Seafoam
   BIG_STONE = '#343d46'
   ICE_STONE = '#b3bbc3'
   ORANGE = '#ffa500'
+  BLUE = '#6699cc'
 end

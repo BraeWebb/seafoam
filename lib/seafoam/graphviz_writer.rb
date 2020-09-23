@@ -123,8 +123,8 @@ module Seafoam
         attrs[:penwidth] = 2
       when 'loop'
         attrs[:penwidth] = 4
-      when 'info'
-        attrs[:style] = 'dashed'
+    #   when 'info'
+    #     attrs[:style] = 'dashed'
       end
 
       # Reversed edges.
@@ -200,7 +200,7 @@ module Seafoam
     # Color theme.
 
     EDGE_COLORS = {
-      'info' => BIG_STONE,
+      'info' => BLACK,
       'control' => AMARANTH,
       'loop' => AMARANTH,
       'data' => KEPPEL,
@@ -209,13 +209,13 @@ module Seafoam
 
     NODE_COLORS = {
       'info' => [DUST, BLACK],
-      'input' => [WHITE_ICE, BLACK],
+      'input' => [CRUISE, BLACK],
       'control' => [CARISSMA, BLACK],
       'effect' => [AMARANTH, WHITE],
       'virtual' => [BIG_STONE, WHITE],
       'guard' => [ORANGE, BLACK],
-      'calc' => [KEPPEL, BLACK],
-      'other' => [DUST, BLACK]
+      'calc' => [CRUISE, BLACK],
+      'other' => [CRUISE, BLACK]
     }
   end
 end

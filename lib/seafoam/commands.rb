@@ -338,6 +338,8 @@ module Seafoam
         when '--dot-path'
           options[:dot_path] = args.shift
           raise ArgumentError, 'no path for --dot-path' unless options[:dot_path]
+        when '--show-stamps'
+          options[:show_stamps] = true
         when '--spotlight'
           spotlight_arg = args.shift
           raise ArgumentError, 'no list for --spotlight' unless spotlight_arg
@@ -465,6 +467,7 @@ module Seafoam
       @out.puts '               --no-reduce-edges'
       @out.puts '               --option key value'
       @out.puts '               --dot_path path_to_dot'
+      @out.puts '               --show-stamps'
       @out.puts '        file.bgv diff'
       @out.puts '               --out directory'
       @out.puts '               --latex-listing graphs.tex'
@@ -511,6 +514,7 @@ module Seafoam
         outfile: "graph.pdf",
         auto_open_outfile: false,
         dot_path: "dot",
+        show_stamps: false,
       }.merge(options)
 
       file, graph_index, *rest = parse_name(name)
